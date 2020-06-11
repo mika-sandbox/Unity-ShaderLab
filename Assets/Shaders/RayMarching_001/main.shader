@@ -19,12 +19,6 @@
 
             #include "UnityCG.cginc"
 
-            struct appdata
-            {
-                float4 vertex : POSITION;
-                float2 uv : TEXCOORD0;
-            };
-
             struct v2f
             {
                 float2 uv : TEXCOORD0;
@@ -32,15 +26,21 @@
                 float4 vertex : SV_POSITION;
             };
 
+            struct f2o
+            {
+                fixed4 color : SV_TARGET;
+                float depth : SV_DEPTH;
+            };
+
             sampler2D _MainTex;
             float4 _MainTex_ST;
 
-            v2f vert (appdata v)
+            v2f vert (appdata_full v)
             {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.pos = v.vertex.xyz;
-                o.uv = v.uv;
+                o.uv = v.texcoord;
                 return o;
             }
 
@@ -78,7 +78,7 @@
                 );
             }
 
-            fixed4 frag (v2f i) : SV_Target
+            f2o frag (v2f i) : SV_Target
             {
                 const float2 position = 2 * i.uv - 1;
                 const float3 rayOrigin = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1)).xyz;
@@ -90,6 +90,7 @@
                 float  distance;
                 float3 normal;
                 int    k;
+                float3 p;
 
                 for (int j = 0; j < 192; j++)
                 {
@@ -101,6 +102,7 @@
 
                     k = j;
                     ray += distance * rayDir;
+                    p = rayOrigin * ray;
                 }
                 
                 if (k == 191) {
@@ -110,7 +112,13 @@
                 color += (float) k / 192;
                 color += max(0, dot(normal, normalize(float3(0.5, 0.75, 0.25))));
 
-                return fixed4(color, 1.0);
+                const float4 projection = UnityObjectToClipPos(float4(p, 1.0));
+
+                f2o o = (f2o) 0;
+                o.color = fixed4(color, 1.0);
+                o.depth = projection.z / projection.w;
+
+                return o;
             }
             ENDCG
         }
